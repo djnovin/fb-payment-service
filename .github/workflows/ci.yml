@@ -20,30 +20,22 @@ jobs:
           - nightly
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-
     steps:
-      - uses: actions/checkout@v3
-
-      # Caching dependencies
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v2
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
       - name: Cache cargo target
         uses: actions/cache@v2
         with:
           path: target
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
-
-      # Setting up rust toolchain
       - name: Set up rust toolchain
         run: |
           rustup update ${{ matrix.toolchain }}
           rustup default ${{ matrix.toolchain }}
-
-      # Building
       - name: Build
         run: cargo build --verbose
 
@@ -57,51 +49,38 @@ jobs:
           - nightly
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-
     steps:
-      - uses: actions/checkout@v3
-
-      # Caching dependencies
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v2
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
       - name: Cache cargo target
         uses: actions/cache@v2
         with:
           path: target
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
-
-      # Testing
       - name: Test
         run: cargo test --verbose
 
   lint:
     runs-on: ubuntu-latest
     needs: build
-
     steps:
-      - uses: actions/checkout@v3
-
-      # Caching dependencies
+      - uses: actions/checkout@v2
       - name: Cache cargo registry
         uses: actions/cache@v2
         with:
           path: ~/.cargo/registry
           key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-
       - name: Cache cargo target
         uses: actions/cache@v2
         with:
           path: target
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
-
-      # Running Linters
       - name: Run rustfmt
         run: cargo fmt --verbose -- --check
-
       - name: Run clippy
         run: cargo clippy --verbose -- -D warnings
 
@@ -109,12 +88,56 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
     needs: [build, lint]
-
     steps:
-      - uses: actions/checkout@v3
-
-      # Audit dependencies
+      - uses: actions/checkout@v2
       - name: Audit dependencies
         run: |
           cargo install cargo-audit
           cargo audit
+
+  setup-infrastructure:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.0.5
+      - name: Initialize Terraform
+        run: terraform init
+      - name: Terraform Plan
+        run: terraform plan
+      - name: Terraform Apply
+        run: terraform apply -auto-approve
+
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    needs: [build, test, lint, audit, setup-infrastructure]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
+      - name: Cache cargo registry
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+      - name: Cache cargo target
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Release lambda
+        run: |
+          pip install cargo-lambda
+          cargo lambda build --release
+          cargo lambda deploy --region ${{ secrets.AWS_DEFAULT_REGION }} --role ${{ secrets.AWS_LAMBDA_ROLE }} --name ${{ secrets.AWS_LAMBDA_NAME }} --timeout ${{ secrets.AWS_LAMBDA_TIMEOUT }} --memory ${{ secrets.AWS_LAMBDA_MEMORY }}
+        env:
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

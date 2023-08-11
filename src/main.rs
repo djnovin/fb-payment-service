@@ -13,9 +13,6 @@ async fn main() -> std::io::Result<()> {
     dotenv().ok();
     env_logger::init();
 
-    // Initialise the Stripe client
-    let client = utils::stripe::initialise_client().await;
-
     let environment = env::var("ENV").unwrap_or_else(|_| "local".to_string());
     let host_var = format!("HOST_{}", environment.to_uppercase());
     let port_var = format!("PORT_{}", environment.to_uppercase());
@@ -31,9 +28,13 @@ async fn main() -> std::io::Result<()> {
 
     info!("Starting server at http://{}:{}", host, port);
 
+    let client = utils::stripe::initialise_client().await;
+    info!("Initialised Stripe Client");
+
     // Start the Actix Web server
     HttpServer::new(move || {
         App::new()
+            .wrap(Logger::default())
             .wrap(
                 Cors::default()
                     .allow_any_origin()
@@ -41,9 +42,7 @@ async fn main() -> std::io::Result<()> {
                     .allow_any_header()
                     .max_age(3600),
             )
-            .wrap(Logger::default())
             .service(
-                // prefixes all resources and routes attached to it...
                 web::scope("/api/payments")
                     .app_data(client.clone())
                     .route(

@@ -14,33 +14,77 @@ jobs:
   build:
     strategy:
       matrix:
-        toolchain: [stable, beta, nightly]
+        toolchain:
+          - stable
+          - beta
+          - nightly
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
     steps:
-      - name: Common setup
-        uses: ../actions/setup
+      - uses: actions/checkout@v3
+
+      # Caching dependencies
+      - name: Cache cargo registry
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo target
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+
+      # Setting up rust toolchain
       - name: Set up rust toolchain
-        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+        run: |
+          rustup update ${{ matrix.toolchain }}
+          rustup default ${{ matrix.toolchain }}
+
+      # Building and Testing
       - name: Build
         run: cargo build --verbose
+
       - name: Test
         run: cargo test --verbose
 
   lint:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Common setup
-        uses: ../actions/setup
+      - uses: actions/checkout@v3
+
+      # Caching dependencies
+      - name: Cache cargo registry
+        uses: actions/cache@v2
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Cache cargo target
+        uses: actions/cache@v2
+        with:
+          path: target
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+
+      # Running Linters
       - name: Run rustfmt
         run: cargo fmt --verbose -- --check
+
       - name: Run clippy
         run: cargo clippy --verbose -- -D warnings
 
   audit:
     runs-on: ubuntu-latest
     continue-on-error: true
+
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/audit-check@v1
+
+      # Audit dependencies
+      - name: Audit dependencies
+        run: |
+          cargo install cargo-audit
+          cargo audit

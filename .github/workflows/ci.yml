@@ -11,9 +11,28 @@ env:
   RUST_BACKTRACE: full
 
 jobs:
+  build_and_test:
+    name: Rust project - latest
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain:
+          - stable
+          - beta
+          - nightly
+    steps:
+      - uses: actions/checkout@v3
+      - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
+      - run: cargo build --verbose
+      - run: cargo test --verbose
+
   build:
     strategy:
       matrix:
+        toolchain:
+          - stable
+          - beta
+          - nightly
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
 
@@ -29,30 +48,11 @@ jobs:
         with:
           path: target
           key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+      - name: Set up rust toolchain
+        run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.toolchain }}
       - name: Build
         run: cargo build --verbose
-
-  test:
-    strategy:
-      matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-    runs-on: ${{ matrix.os }}
-
-    needs: [build, lint]
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Cache cargo registry
-        uses: actions/cache@v2
-        with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
-      - name: Cache cargo target
-        uses: actions/cache@v2
-        with:
-          path: target
-          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
-      - name: Run tests
+      - name: Test
         run: cargo test --verbose
 
   lint:
@@ -81,7 +81,7 @@ jobs:
     runs-on: ubuntu-latest
     continue-on-error: true
 
-    needs: [build, lint, test]
+    needs: [build, lint]
 
     steps:
       - uses: actions/checkout@v3

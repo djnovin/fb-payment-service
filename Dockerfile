@@ -7,7 +7,7 @@
 FROM rust:1.67 as builder
 
 # Setup working directory
-WORKDIR /usr/src/ns-api
+WORKDIR /usr/src/fb-payment-service
 COPY . .
 COPY .env .env
 
@@ -28,7 +28,7 @@ FROM gcr.io/distroless/cc-debian10
 ARG ARCH=aarch64
 
 # Application files
-COPY --from=builder /usr/local/cargo/bin/ns-api /usr/local/bin/ns-api
-COPY --from=builder /usr/src/ns-api/.env /usr/local/bin/.env
+COPY --from=builder /usr/local/cargo/bin/fb-payment-service /usr/local/bin/fb-payment-service
+COPY --from=builder /usr/src/fb-payment-service/.env /usr/local/bin/.env
 
 CMD ["fb-payment-service"]

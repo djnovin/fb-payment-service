@@ -1,0 +1,38 @@
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: full
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Build
+        run: cargo build --verbose
+
+  test:
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run tests
+        run: cargo test --verbose
+
+  lint:
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run clippy
+        run: cargo clippy --verbose -- -D warnings
+
+  fmt:
+    steps:
+      - uses: actions/checkout@v3
+      - name: Run rustfmt
+        run: cargo fmt --verbose -- --check

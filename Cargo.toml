@@ -17,3 +17,5 @@ log = "0.4.19"
 regex = "1.9.3"
 serde = { version = "1.0.183", features = ["derive"] }
 validator = { version = "0.16.1", features = ["derive"] }
+clippy = "0.0.302"
+fmt = "0.1.0"

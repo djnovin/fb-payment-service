@@ -26,23 +26,14 @@ pub async fn create_customer(
     client: web::Data<Client>,
     params: web::Json<CreateCustomerParams>,
 ) -> Result<HttpResponse, Error> {
-    let mut create_customer = CreateCustomer::default();
-
-    create_customer.address = params.address.clone();
-
-    if let Some(email) = &params.email {
-        create_customer.email = Some(&**email);
-    }
-
-    if let Some(name) = &params.name {
-        create_customer.name = Some(&**name);
-    }
-
-    if let Some(phone) = &params.phone {
-        create_customer.phone = Some(&**phone);
-    }
-
-    create_customer.payment_method = params.payment_method.clone();
+    let create_customer = CreateCustomer {
+        address: params.address.clone(),
+        email: params.email.as_deref(),
+        name: params.name.as_deref(),
+        phone: params.phone.as_deref(),
+        payment_method: params.payment_method.clone(),
+        ..Default::default()
+    };
 
     match Customer::create(&client, create_customer).await {
         Ok(customer) => Ok(HttpResponse::Ok().json(customer)),
